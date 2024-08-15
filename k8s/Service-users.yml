@@ -1,0 +1,19 @@
+---
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "users"
+  labels:
+    nirmata.io/service.name: "users"
+spec:
+  externalIPs: []
+  loadBalancerSourceRanges: []
+  sessionAffinity: "None"
+  type: "ClusterIP"
+  selector:
+    nirmata.io/service.name: "users"
+  ports:
+  - name: "https"
+    port: 443
+    protocol: "TCP"
+    targetPort: 8443

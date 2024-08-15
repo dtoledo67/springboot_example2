@@ -1,0 +1,12 @@
+---
+apiVersion: "policy/v1beta1"
+kind: "PodDisruptionBudget"
+metadata:
+  name: "static-files-pdb"
+  labels: {}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      nirmata.io/service.name: "static-files"
+    matchExpressions: []

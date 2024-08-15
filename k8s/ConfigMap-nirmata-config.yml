@@ -1,0 +1,23 @@
+---
+kind: "ConfigMap"
+apiVersion: "v1"
+data:
+  nirmata.url: "www.nirmata.io"
+  http_proxy: ""
+  no_proxy: ""
+  NO_PROXY: ""
+  product: "Enterprise"
+  productName: "CloudEdition"
+  tenancyModel: "multiple"
+  productVersion: ""
+  https_proxy: ""
+  HTTPS_PROXY: ""
+  HTTP_PROXY: ""
+  tunnelServerAddress: https://tunnel-0.tunnel:9090,https://tunnel-1.tunnel:9090
+binaryData: {}
+metadata:
+  annotations: {}
+  name: "nirmata-config"
+  labels:
+    nirmata.io/configmap.name: "nirmata-config"
+    nirmata.io/type: "app"

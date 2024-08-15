@@ -1,0 +1,20 @@
+---
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  annotations: {}
+  name: "mongodb-hs"
+  labels:
+    name: "mongodb-hs"
+spec:
+  clusterIP: "None"
+  externalIPs: []
+  loadBalancerSourceRanges: []
+  sessionAffinity: "None"
+  type: "ClusterIP"
+  selector:
+    app: "mongodb"
+  ports:
+  - port: 27017
+    protocol: "TCP"
+    targetPort: 27017

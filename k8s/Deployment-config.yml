@@ -1,0 +1,176 @@
+---
+kind: "Deployment"
+apiVersion: "apps/v1"
+metadata:
+  name: "config"
+  labels:
+    nirmata.io/deployment.name: "config"
+    nirmata.io/service.name: "config"
+    nirmata.io/type: "app"
+spec:
+  progressDeadlineSeconds: 2147483647
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      nirmata.io/service.name: "config"
+    matchExpressions: []
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations: {}
+      labels:
+        nirmata.io/deployment.name: "config"
+        nirmata.io/service.name: "config"
+        nirmata.io/type: "app"
+        nirmata.io/force.rolling.update: "2"
+    spec:
+      serviceAccountName: "config-service"
+      automountServiceAccountToken: false
+      restartPolicy: "Always"
+      terminationGracePeriodSeconds: 30
+      nodeSelector: {}
+      schedulerName: "default-scheduler"
+      priorityClassName: "nirmata-app-critical"
+      dnsPolicy: "ClusterFirst"
+      imagePullSecrets:
+      - name: registry-v2.nirmata.io
+      - name: ghcr.io
+      containers:
+      - name: "config"
+        image: "ghcr.io/nirmata/config:4.13.0-27.g8c4a50d"
+        command: []
+        args: []
+        terminationMessagePath: "/dev/termination-log"
+        terminationMessagePolicy: "File"
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - name: "https"
+          containerPort: 8443
+          protocol: "TCP"
+        - name: "yourkit"
+          containerPort: 10001
+          protocol: "TCP"
+        env:
+        - name: "JAVA_TOOL_OPTIONS"
+          value: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9999 \
+        -Dcom.sun.management.jmxremote.rmi.port=9999 -Dcom.sun.management.jmxremote.authenticate=false \
+        -Dcom.sun.management.jmxremote.ssl=false"
+        - name: "JAVA_OPTS"
+          value: "-XshowSettings:vm -XX:MaxRAMPercentage=70.0 -agentpath:/usr/local/YourKit-JavaProfiler-2023.5/bin/linux-musl-x86-64/libyjpagent.so=port=10001,listen=all"
+        - name: "nirmata.environment.name"
+          valueFrom:
+            fieldRef:
+              apiVersion: "v1"
+              fieldPath: "metadata.namespace"
+        - name: "eureka.registration.enabled"
+          value: "false"
+        - name: "nirmata.service.dnsclient"
+          value: "true"
+        - name: "nirmata.locks.mongo.enabled"
+          value: "true"
+        - name: "service.mongodb.seedSet"
+          value: "mongodb:27017"
+        - name: "nirmata.zookeeper.address"
+          value: "zookeeper:2181"
+        - name: "nirmata.kafka.address"
+          value: "kafka:9092"
+        - name: "service.es.address"
+          value: "elasticsearch"
+        - name: "service.logs.level"
+          value: "warn"
+        - name: "HTTP_PROXY"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "HTTP_PROXY"
+        - name: "HTTPS_PROXY"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "HTTPS_PROXY"
+        - name: "NO_PROXY"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "NO_PROXY"
+        - name: "http_proxy"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "http_proxy"
+        - name: "https_proxy"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "https_proxy"
+        - name: "no_proxy"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "no_proxy"
+        livenessProbe:
+          initialDelaySeconds: 120
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          httpGet:
+            path: "/config/status"
+            port: 8443
+            scheme: "HTTPS"
+        readinessProbe:
+          initialDelaySeconds: 10
+          timeoutSeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          httpGet:
+            path: "/config/status"
+            port: 8443
+            scheme: "HTTPS"
+        resources:
+          limits:
+            memory: "2Gi"
+          requests:
+            cpu: 1
+            memory: "500Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      securityContext:
+        supplementalGroups: []
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - namespaces: []
+            labelSelector:
+              matchLabels: {}
+              matchExpressions:
+              - key: "nirmata.io/deployment.name"
+                operator: "In"
+                values:
+                - "config"
+            topologyKey: "kubernetes.io/hostname"
+      tolerations:
+      - key: "nirmata.io/dedicated-worker-group"
+        operator: "Equal"
+        value: "worker-group-1"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 20
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 20

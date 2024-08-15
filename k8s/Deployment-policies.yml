@@ -1,0 +1,136 @@
+---
+kind: "Deployment"
+apiVersion: "apps/v1"
+metadata:
+  annotations: {}
+  name: "policies"
+  labels:
+    nirmata.io/deployment.name: "policies"
+    nirmata.io/service.name: "policies"
+    nirmata.io/type: "app"
+    nirmata.io/component: "policies"
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      nirmata.io/service.name: "policies"
+      nirmata.io/component: "policies"
+    matchExpressions: []
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations: {}
+      labels:
+        nirmata.io/deployment.name: "policies"
+        nirmata.io/service.name: "policies"
+        nirmata.io/type: "app"
+        nirmata.io/component: "policies"
+    spec:
+      serviceAccountName: "policies-service"
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector: {}
+      priorityClassName: "nirmata-app-critical"
+      containers:
+      - name: "policies"
+        image: "ghcr.io/nirmata/policies:4.20.0-rc2-15-gb9ae68d"
+        command: []
+        args: []
+        ports:
+        - name: "https"
+          containerPort: 8443
+          protocol: "TCP"
+        env:
+        - name: "nirmata.environment.name"
+          valueFrom:
+            fieldRef:
+              apiVersion: "v1"
+              fieldPath: "metadata.namespace"
+        - name: nirmata.instance.name
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: "JAVA_OPTS"
+          value: "-Xmx6400M -Xms6400M -XshowSettings:VM"
+        - name: "eureka.registration.enabled"
+          value: "false"
+        - name: "nirmata.service.dnsclient"
+          value: "true"
+        - name: "service.mongodb.seedSet"
+          value: "mongodb:27017"
+        - name: "nirmata.zookeeper.address"
+          value: "zookeeper:2181"
+        - name: "nirmata.kafka.address"
+          value: "kafka:9092"
+        - name: "service.logs.level"
+          value: "debug"
+        - name: "nirmata.tunnelServer.address"
+          valueFrom:
+            configMapKeyRef:
+              key: "tunnelServerAddress"
+              name: "nirmata-config"
+        - name: "nirmata.services.url"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "nirmata.url"
+        - name: "nirmata.product.version"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "productVersion"
+        - name: "nirmata.product.name"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "product"
+        resources:
+          limits:
+            memory: "8Gi"
+          requests:
+            memory: "8Gi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        livenessProbe:
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 5
+          httpGet:
+            path: "/policies/status"
+            port: 8443
+            scheme: "HTTPS"
+        readinessProbe:
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 5
+          httpGet:
+            path: "/policies/status"
+            port: 8443
+            scheme: "HTTPS"
+      imagePullSecrets:
+      - name: ghcr.io            
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 20
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 20

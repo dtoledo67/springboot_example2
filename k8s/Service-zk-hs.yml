@@ -1,0 +1,25 @@
+---
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  annotations: {}
+  name: "zk-hs"
+  labels:
+    app: "zk"
+spec:
+  clusterIP: "None"
+  externalIPs: []
+  loadBalancerSourceRanges: []
+  sessionAffinity: "None"
+  type: "ClusterIP"
+  selector:
+    app: "zk"
+  ports:
+  - name: "server"
+    port: 2888
+    protocol: "TCP"
+    targetPort: 2888
+  - name: "leader-election"
+    port: 3888
+    protocol: "TCP"
+    targetPort: 3888

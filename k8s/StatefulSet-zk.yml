@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations: {}
+  labels:
+    nirmata.io/service.name: zk
+    nirmata.io/statefulset.name: zk
+    nirmata.io/type: data
+  name: zk
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: zk
+      nirmata.io/service.name: zk
+      nirmata.io/statefulset.name: zk
+      nirmata.io/type: data
+  serviceName: zk-hs
+  template:
+    metadata:
+      labels:
+        app: zk
+        nirmata.io/service.name: zk
+        nirmata.io/statefulset.name: zk
+        nirmata.io/type: data
+    spec:
+      serviceAccountName: "zk-service"
+      automountServiceAccountToken: false
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - zk
+              topologyKey: kubernetes.io/hostname
+      imagePullSecrets:
+      - name: registry-v2.nirmata.io
+      containers:
+        - command:
+            - sh
+            - '-c'
+            - >-
+              start-zookeeper --servers=$(REPLICAS)
+              --data_dir=/var/lib/zookeeper/data
+              --data_log_dir=/var/lib/zookeeper/data/log
+              --conf_dir=/opt/zookeeper/conf --client_port=2181
+              --election_port=3888 --server_port=2888 --tick_time=2000
+              --init_limit=10 --sync_limit=5 --heap=6144M --max_client_cnxns=120
+              --snap_retain_count=3 --purge_interval=1
+              --max_session_timeout=40000 --min_session_timeout=4000
+              --log_level=WARN
+          env:
+            - name: REPLICAS
+              value: '3'
+          image: 'ghcr.io/nirmata/kubernetes-zookeeper:v4-zk3.6.3'
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - '-c'
+                - zookeeper-ready 2181
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: kubernetes-zookeeper
+          ports:
+            - containerPort: 2181
+              name: client
+              protocol: TCP
+            - containerPort: 2888
+              name: server
+              protocol: TCP
+            - containerPort: 3888
+              name: leader-election
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - '-c'
+                - zookeeper-ready 2181
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            limits:
+              memory: 6Gi
+            requests:
+              cpu: '3'
+              memory: 6Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/lib/zookeeper
+              name: datadir
+      dnsPolicy: ClusterFirst
+      priorityClassName: nirmata-data-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 20
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 20
+  updateStrategy:
+    type: RollingUpdate
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        dataSource: null
+        resources:
+          requests:
+            storage: 800Gi
+        storageClassName: ebs-sc-2a
+        volumeMode: Filesystem

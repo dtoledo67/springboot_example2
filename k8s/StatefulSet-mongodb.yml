@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations: {}
+  labels:
+    nirmata.io/service.name: mongodb
+    nirmata.io/statefulset.name: mongodb
+    nirmata.io/type: data
+  name: mongodb
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: mongodb
+      nirmata.io/service.name: mongodb
+      nirmata.io/statefulset.name: mongodb
+      nirmata.io/type: data
+  serviceName: mongodb-hs
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        environment: production
+        nirmata.io/service.name: mongodb
+        nirmata.io/statefulset.name: mongodb
+        nirmata.io/type: data
+        replicaset: nirmata
+        role: mongodb
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - mongodb
+            topologyKey: kubernetes.io/hostname
+      imagePullSecrets:
+      - name: registry-v2.nirmata.io
+      - name: ghcr.io
+      containers:
+      - command:
+        - mongod
+        - --wiredTigerCacheSizeGB
+        - "60"
+        - --bind_ip
+        - 0.0.0.0
+        - --replSet
+        - nirmata
+        image: ghcr.io/nirmata/mongodb:5.0.15
+        imagePullPolicy: IfNotPresent
+        name: mongodb
+        ports:
+        - containerPort: 27017
+          protocol: TCP
+        resources:
+          limits:
+            memory: 100Gi
+          requests:
+            cpu: "3"
+            memory: 70Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data/db
+          name: mongodb-data-volume
+      - env:
+        - name: MONGO_SIDECAR_POD_LABELS
+          value: role=mongodb,environment=production
+        - name: KUBE_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: KUBERNETES_MONGO_SERVICE_NAME
+          value: mongodb-hs
+        image: ghcr.io/nirmata/mongo-k8s-sidecar:5.0.15
+        imagePullPolicy: IfNotPresent
+        name: mongo-sidecar
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      priorityClassName: nirmata-data-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: mongodb
+      serviceAccountName: mongodb
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "mongodb"
+        effect: "NoSchedule"
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 20
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 20
+  updateStrategy:
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-data-volume
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      dataSource: null
+      resources:
+        requests:
+          storage: 1000Gi
+      storageClassName: ebs-sc-2a
+      volumeMode: Filesystem
