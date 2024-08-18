@@ -1,0 +1,26 @@
+---
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "haproxy"
+  labels:
+    nirmata.io/service.name: "haproxy"
+spec:
+  externalIPs: []
+  externalTrafficPolicy: "Cluster"
+  loadBalancerSourceRanges: []
+  sessionAffinity: "None"
+  type: "NodePort"
+  selector:
+    nirmata.io/service.name: "haproxy"
+  ports:
+  - name: "https"
+    nodePort: 31443
+    port: 443
+    protocol: "TCP"
+    targetPort: 8443
+  - name: "stats"
+    nodePort: 31936
+    port: 1936
+    protocol: "TCP"
+    targetPort: 1936

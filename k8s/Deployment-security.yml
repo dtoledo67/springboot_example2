@@ -1,0 +1,183 @@
+---
+kind: "Deployment"
+apiVersion: "apps/v1"
+metadata:
+  name: "security"
+  labels:
+    nirmata.io/deployment.name: "security"
+    nirmata.io/service.name: "security"
+    nirmata.io/type: "app"
+spec:
+  progressDeadlineSeconds: 2147483647
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      nirmata.io/service.name: "security"
+    matchExpressions: []
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations: {}
+      labels:
+        nirmata.io/deployment.name: "security"
+        nirmata.io/service.name: "security"
+        nirmata.io/type: "app"
+        nirmata.io/force.rolling.update: "2"
+    spec:
+      serviceAccountName: "security-service"
+      automountServiceAccountToken: false
+      restartPolicy: "Always"
+      terminationGracePeriodSeconds: 30
+      nodeSelector: {}
+      schedulerName: "default-scheduler"
+      priorityClassName: "nirmata-app-critical"
+      dnsPolicy: "ClusterFirst"
+      imagePullSecrets:
+      - name: registry-v2.nirmata.io
+      - name: ghcr.io
+      containers:
+      - name: "security"
+        image: "ghcr.io/nirmata/security:4.20.0-rc2"
+        command: []
+        args: []
+        terminationMessagePath: "/dev/termination-log"
+        terminationMessagePolicy: "File"
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - name: "https"
+          containerPort: 8443
+          protocol: "TCP"
+        env:
+        - name: "JAVA_TOOL_OPTIONS"
+          value: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9999 \
+        -Dcom.sun.management.jmxremote.rmi.port=9999 -Dcom.sun.management.jmxremote.authenticate=false \
+        -Dcom.sun.management.jmxremote.ssl=false"
+        - name: "JAVA_OPTS"
+          value: "-XshowSettings:vm -XX:MaxRAMPercentage=70.0 -Dnirmata.awssubscription.enable=true"
+        - name: "nirmata.environment.name"
+          valueFrom:
+            fieldRef:
+              apiVersion: "v1"
+              fieldPath: "metadata.namespace"
+        - name: "eureka.registration.enabled"
+          value: "false"
+        - name: "nirmata.service.dnsclient"
+          value: "true"
+        - name: "nirmata.zookeeper.address"
+          value: "zookeeper:2181"
+        - name: "nirmata.kafka.address"
+          value: "kafka:9092"
+        - name: "service.logs.level"
+          value: "warn"
+        - name: "nirmata.gateway.address"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "nirmata.url"
+        - name: nirmata.product.name
+          valueFrom:
+            configMapKeyRef:
+              key: "productName"
+              name: "nirmata-config"
+        - name: nirmata.product.tenancymodel
+          valueFrom:
+            configMapKeyRef:
+              name: nirmata-config
+              key: tenancyModel
+        - name: "HTTP_PROXY"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "HTTP_PROXY"
+        - name: "HTTPS_PROXY"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "HTTPS_PROXY"
+        - name: "NO_PROXY"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "NO_PROXY"
+        - name: "http_proxy"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "http_proxy"
+        - name: "https_proxy"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "https_proxy"
+        - name: "no_proxy"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "no_proxy"
+        - name: "nirmata.product.name"
+          valueFrom:
+            configMapKeyRef:
+              name: "nirmata-config"
+              key: "productName"
+        livenessProbe:
+          initialDelaySeconds: 120
+          timeoutSeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          httpGet:
+            path: "/security/status"
+            port: 8443
+            scheme: "HTTPS"
+        readinessProbe:
+          initialDelaySeconds: 10
+          timeoutSeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          httpGet:
+            path: "/security/status"
+            port: 8443
+            scheme: "HTTPS"
+        resources:
+          limits:
+            memory: "400Mi"
+          requests:
+            memory: "400Mi"
+            cpu: 100m
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      securityContext:
+        supplementalGroups: []
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - namespaces: []
+            labelSelector:
+              matchLabels: {}
+              matchExpressions:
+              - key: "nirmata.io/deployment.name"
+                operator: "In"
+                values:
+                - "security"
+            topologyKey: "kubernetes.io/hostname"
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 20
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 20
